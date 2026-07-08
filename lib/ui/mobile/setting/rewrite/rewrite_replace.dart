@@ -219,7 +219,7 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
           const SizedBox(width: 5),
           Text(localizations.enable),
           const SizedBox(width: 5),
-          SwitchWidget(
+                   SwitchWidget(
               value: rewriteItem.enabled,
               scale: 0.65,
               onChanged: (val) => setState(() {
@@ -313,7 +313,7 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
             child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
           Text(localizations.enable),
           const SizedBox(width: 10),
-          SwitchWidget(
+                   SwitchWidget(
               value: rewriteItem.enabled,
               scale: 0.65,
               onChanged: (val) => setState(() {
@@ -355,7 +355,7 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
               child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
             Text(localizations.enable),
             const SizedBox(width: 10),
-            SwitchWidget(
+                     SwitchWidget(
                 value: rewriteItem.enabled,
                 scale: 0.65,
                 onChanged: (val) {
@@ -432,7 +432,7 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
             child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
           Text(localizations.enable),
           const SizedBox(width: 10),
-          SwitchWidget(
+                   SwitchWidget(
               value: rewriteItem.enabled,
               scale: 0.65,
               onChanged: (val) => setState(() {
@@ -471,6 +471,22 @@ class Headers extends StatefulWidget {
   @override
   State<StatefulWidget> createState() {
     return HeadersState();
+  }
+
+  Widget wssEdit(RewriteItem item) {
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(children: [
+        textField("Key", item.key, "imageBit", onChanged: (v) => item.key = v),
+        const SizedBox(height: 10),
+        textField("Value(hex)", item.value, "ff", onChanged: (v) => item.value = v),
+        const SizedBox(height: 10),
+        Row(children: [
+          Text(localizations.enable),
+          SwitchWidget(value: item.enabled, scale: 0.8,
+            onChanged: (v) => setState(() => item.enabled = v)));
+        ])
+      ]));
   }
 }
 
@@ -596,19 +612,4 @@ class HeadersState extends State<Headers> with AutomaticKeepAliveClientMixin {
     ]);
   }
 
-  Widget wssEdit(RewriteItem item) {
-    return Padding(
-      padding: const EdgeInsets.all(10),
-      child: Column(children: [
-        textField("字段名(key)", item.key, "imageBit", onChanged: (v) => item.key = v),
-        const SizedBox(height: 10),
-        textField("Value(hex)", item.value, "ff", onChanged: (v) => item.value = v),
-        const SizedBox(height: 10),
-        Row(children: [
-          Text(localizations.enable),
-          SwitchWidget(value: item.enabled, scale: 0.8,
-            onChanged: (v) => setState(() => item.enabled = v)))
-        ])
-      ]));
-  }
 }
