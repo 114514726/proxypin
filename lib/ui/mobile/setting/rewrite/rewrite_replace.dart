@@ -84,6 +84,12 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
       return;
     }
 
+    if (ruleType == RuleType.wsResponseReplace || ruleType == RuleType.wsResponseUpdate ||
+        ruleType == RuleType.wsRequestReplace || ruleType == RuleType.wsRequestUpdate) {
+      _initRewriteItem(items, RewriteType.replaceResponseBody, enabled: true);
+      return;
+    }
+
     if (ruleType == RuleType.responseReplace) {
       _initRewriteItem(items, RewriteType.replaceResponseStatus);
       _initRewriteItem(items, RewriteType.replaceResponseHeader);
@@ -141,6 +147,11 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
               KeepAliveWrapper(child: body())
             ])),
       );
+    }
+
+    if (ruleType == RuleType.wsResponseReplace || ruleType == RuleType.wsResponseUpdate ||
+        ruleType == RuleType.wsRequestReplace || ruleType == RuleType.wsRequestUpdate) {
+      return wssEdit(items.first);
     }
 
     return Container();
@@ -583,5 +594,21 @@ class HeadersState extends State<Headers> with AutomaticKeepAliveClientMixin {
       Expanded(flex: 6, child: val),
       op ?? const SizedBox()
     ]);
+  }
+
+  Widget wssEdit(RewriteItem item) {
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(children: [
+        textField("字段名(key)", item.key, "imageBit", onChanged: (v) => item.key = v),
+        const SizedBox(height: 10),
+        textField("Value(hex)", item.value, "ff", onChanged: (v) => item.value = v),
+        const SizedBox(height: 10),
+        Row(children: [
+          Text(localizations.enable),
+          SwitchWidget(value: item.enabled, scale: 0.8,
+            onChanged: (v) => setState(() => item.enabled = v)))
+        ])
+      ]));
   }
 }
