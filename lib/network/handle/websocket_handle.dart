@@ -33,18 +33,18 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
 
     for (var r in _rules) {
       var key = r['key']!;
-      var oldB = r['old']!;
-      var newB = r['new']!;
+      var oldB = (r['old'] as List).cast<int>();
+      var newB = (r['new'] as List).cast<int>();
       for (int k = 0; k < 256; k++) {
         var p = <int>[key.length ^ k];
         for (var c in key.codeUnits) p.add(c ^ k);
         p.add(oldB.length ^ k);
-        for (var b in oldB) p.add(b ^ k);
+        for (int b in oldB) p.add(b ^ k);
         for (int i = 0; i <= data.length - p.length; i++) {
           if (p.asMap().entries.every((e) => data[i + e.key] == e.value)) {
             var mod = Uint8List.fromList(data);
-            for (var j = 0; j < newB.length; j++)
-              mod[i + p.length - oldB.length + j] = (newB[j] as int) ^ k;
+            for (var j = 0; j < newB.length; j++) { int nb = newB[j] as int;
+              mod[i + p.length - oldB.length + j] = nb ^ k; }
             logger.i('[WSS] $key ${oldB.map((b)=>b.toRadixString(16)).join()}->${newB.map((b)=>b.toRadixString(16)).join()}');
             return mod;
           }
