@@ -40,7 +40,7 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
         (message is HttpRequest) ? message.requestUrl : (message as HttpResponse).request?.requestUrl, types);
     if (rule == null) return data;
     final items = await manager.getRewriteItems(rule);
-    for (final item in items) {
+    if (items == null) return data; for (final item in items) {
       if (!item.enabled) continue;
       final fieldName = item.key ?? '';
       // _toHex: name_len^K, fieldName^K, val_len^K
@@ -57,7 +57,6 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
           final valPos = valLenPos + 1;
           if (valPos >= data.length) continue;
           final oldVal = data[valPos] ^ k;
-          if (oldVal != expected) continue;
           final newVal = int.tryParse(item.value ?? 'ff', radix: 16) ?? 0xFF;
           var mod = Uint8List.fromList(data);
           mod[valPos] = newVal ^ k;
