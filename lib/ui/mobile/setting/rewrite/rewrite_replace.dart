@@ -68,7 +68,7 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
         Row(children: [
           Text(localizations.enable),
           SwitchWidget(value: item.enabled, scale: 0.8,
-            onChanged: (v) => setState(() => item.enabled = v));
+            onChanged: (v) => setState(() => item.enabled = v))),
         ])
       ]));
   }
