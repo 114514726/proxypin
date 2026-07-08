@@ -1,0 +1,18 @@
+name: Build ProxyPin APK
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+      - run: flutter pub get
+      - run: flutter build apk --debug --no-tree-shake-icons
+        env:
+          BUILD_NUMBER: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: proxypin-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
