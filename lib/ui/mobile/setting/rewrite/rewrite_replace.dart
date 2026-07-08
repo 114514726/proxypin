@@ -56,6 +56,7 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
     super.initState();
     initItems(widget.ruleType, widget.items);
     findController = FindController(bodyTextController);
+  }
   Widget wssEdit(RewriteItem item) {
     return Padding(
       padding: const EdgeInsets.all(10),
@@ -67,10 +68,9 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
         Row(children: [
           Text(localizations.enable),
           SwitchWidget(value: item.enabled, scale: 0.8,
-            onChanged: (v) => setState(() => item.enabled = v)))
+            onChanged: (v) => setState(() => item.enabled = v));
         ])
       ]));
-  }
   }
 
   @override
