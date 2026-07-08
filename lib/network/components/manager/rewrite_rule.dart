@@ -27,7 +27,11 @@ enum RuleType {
   responseReplace("替换响应"),
   requestUpdate("修改请求"),
   responseUpdate("修改响应"),
-  redirect("重定向");
+  redirect("重定向"),
+  wsResponseReplace("WSS响应替换"),
+  wsResponseUpdate("WSS响应修改"),
+  wsRequestReplace("WSS请求替换"),
+  wsRequestUpdate("WSS请求修改");
 
   //名称
   final String label;
