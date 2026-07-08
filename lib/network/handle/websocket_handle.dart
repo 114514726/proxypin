@@ -44,7 +44,7 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
           if (p.asMap().entries.every((e) => data[i + e.key] == e.value)) {
             var mod = Uint8List.fromList(data);
             for (var j = 0; j < newB.length; j++)
-              mod[i + p.length - oldB.length + j] = newB[j] ^ k;
+              mod[i + p.length - oldB.length + j] = (newB[j] ^ k) as int;
             logger.i('[WSS] $key ${oldB.map((b)=>b.toRadixString(16)).join()}->${newB.map((b)=>b.toRadixString(16)).join()}');
             return mod;
           }
