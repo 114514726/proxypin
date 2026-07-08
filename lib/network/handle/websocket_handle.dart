@@ -1,10 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:proxypin/network/channel/channel.dart';
 import 'package:proxypin/network/channel/channel_context.dart';
-import 'package:proxypin/network/components/manager/request_rewrite_manager.dart';
-import 'package:proxypin/network/components/manager/rewrite_rule.dart';
 import 'package:proxypin/network/http/http.dart';
 import 'package:proxypin/network/http/websocket.dart';
 import 'package:proxypin/network/util/logger.dart';
@@ -13,54 +12,63 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
   final WebSocketDecoder decoder = WebSocketDecoder();
   final Channel proxyChannel;
   final HttpMessage message;
+  static List<Map>? _rules;
+  static int _lastSize = -1;
 
   WebSocketChannelHandler(this.proxyChannel, this.message);
 
   @override
-  Future<void> channelRead(ChannelContext channelContext, Channel channel, Uint8List msg) async {
-    if (message is HttpResponse) {
-      msg = await _applyRewrites(msg, false);
-    }
+  Future<void> channelRead(ChannelContext ctx, Channel ch, Uint8List msg) async {
+    if (message is HttpResponse) msg = _apply(msg);
     proxyChannel.writeBytes(msg);
-    WebSocketFrame? frame;
-    try { frame = decoder.decode(msg); } catch (_) {}
-    if (frame == null) return;
-    frame.isFromClient = message is HttpRequest;
-    message.messages.add(frame);
-    channelContext.listener?.onMessage(channel, message, frame);
+    try {
+      var f = decoder.decode(msg);
+      if (f != null) {
+        f.isFromClient = message is HttpRequest;
+        message.messages.add(f);
+        ctx.listener?.onMessage(ch, message, f);
+      }
+    } catch (_) {}
   }
 
-  Future<Uint8List> _applyRewrites(Uint8List data, bool fromClient) async {
-    final manager = await RequestRewriteManager.instance;
-    if (!manager.enabled) return data;
-    final types = fromClient
-        ? [RuleType.wsRequestReplace, RuleType.wsRequestUpdate]
-        : [RuleType.wsResponseReplace, RuleType.wsResponseUpdate];
-    final rule = manager.getRewriteRule(
-        (message is HttpRequest) ? message.requestUrl : (message as HttpResponse).request?.requestUrl, types);
-    if (rule == null) return data;
-    final items = await manager.getRewriteItems(rule);
-    if (items == null) return data; for (final item in items) {
-      if (!item.enabled) continue;
-      final fieldName = item.key ?? '';
-      // _toHex: name_len^K, fieldName^K, val_len^K
+  Uint8List _apply(Uint8List data) {
+    try {
+      var f = File('/sdcard/proxypin_wss.json');
+      if (!f.existsSync()) return data;
+      var sz = f.lengthSync();
+      if (sz != _lastSize) {
+        _rules = (jsonDecode(f.readAsStringSync()) as List).cast<Map>();
+        _lastSize = sz;
+        logger.i('[WSS] 加载 ${_rules!.length} 条规则');
+      }
+    } catch (e) {
+      return data;
+    }
+    if (_rules == null || _rules!.isEmpty) return data;
+
+    var hex = _hex(data);
+    for (var r in _rules!) {
+      var key = r['key'] as String?;
+      var from = r['from'] as String?;
+      var to = r['to'] as String?;
+      var dir = r['dir'] as String? ?? 'download';
+      if (dir != 'download' && dir != 'both') continue;
+      if (key == null || to == null) continue;
+
+      // XOR暴力扫描
       for (int k = 0; k < 256; k++) {
-        final prefix = _toHex(Uint8List.fromList([fieldName.length ^ k]));
-        final nameHex = _toHex(Uint8List.fromList(fieldName.codeUnits.map((c) => c ^ k).toList()));
-        final pat = prefix + nameHex;
-        final hex = _toHex(data);
-        final idx = hex.indexOf(pat);
+        var nameHex = _hex(Uint8List.fromList([key.length ^ k]));
+        var valHex = _hex(Uint8List.fromList(key.codeUnits.map((c) => c ^ k).toList()));
+        var pat = nameHex + valHex;
+        var idx = hex.indexOf(pat);
         if (idx >= 0) {
-          final valLenPos = (idx ~/ 2) + 1 + fieldName.length;
-          if (valLenPos >= data.length) continue;
-          final valLen = data[valLenPos]; // XOR'd val_len
-          final valPos = valLenPos + 1;
+          var valPos = (idx ~/ 2) + 1 + key.length + 1;
           if (valPos >= data.length) continue;
-          final oldVal = data[valPos] ^ k;
-          final newVal = int.tryParse(item.value ?? 'ff', radix: 16) ?? 0xFF;
+          var oldVal = data[valPos] ^ k;
+          var newVal = int.tryParse(to, radix: 16) ?? 0xFF;
           var mod = Uint8List.fromList(data);
           mod[valPos] = newVal ^ k;
-          logger.i('[WSS] ${fieldName}: 0x${oldVal.toRadixString(16)}→0x${newVal.toRadixString(16)} k=${k.toRadixString(16)}');
+          logger.i('[WSS] $key: $oldVal→$newVal');
           return mod;
         }
       }
@@ -68,5 +76,5 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
     return data;
   }
 
-  static String _toHex(Uint8List b) => b.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+  static String _hex(Uint8List b) => b.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
 }
