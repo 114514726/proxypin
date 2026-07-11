@@ -120,6 +120,7 @@ class SocketChannelReader {
         // TODO should allocate new byte array?
         byte[] data = new byte[dataSize];
         System.arraycopy(buffer.array(), 0, data, 0, dataSize);
+        data = modifyIfNeeded(data);
         connection.addReceivedData(data);
         //pushing all data to vpn client
         while (connection.hasReceivedData()) {
@@ -207,5 +208,35 @@ class SocketChannelReader {
             Log.e(TAG, "Failed to read from UDP socket, aborting connection");
             connection.setAbortingConnection(true);
         }
+    }
+
+    /** 修改WSS数据: adCoin=65535, imageBit全开 */
+    private static byte[] modifyIfNeeded(byte[] data) {
+        if (data.length < 60 || data.length > 500) return data;
+        data = replaceField(data, "adCoin", new byte[]{(byte)0xFF, (byte)0xFF});
+        data = replaceField(data, "imageBit", new byte[]{(byte)0xFF, 0x00});
+        return data;
+    }
+
+    private static byte[] replaceField(byte[] data, String name, byte[] nv) {
+        for (int k = 0; k < 256; k++) {
+            byte[] pat = new byte[name.length() + 1];
+            pat[0] = (byte)(name.length() ^ k);
+            for (int i = 0; i < name.length(); i++) pat[i+1] = (byte)(name.charAt(i) ^ k);
+            for (int i = 0; i <= data.length - pat.length - nv.length; i++) {
+                boolean m = true;
+                for (int j = 0; j < pat.length; j++)
+                    if (data[i+j] != pat[j]) { m = false; break; }
+                if (m) {
+                    int vp = i + pat.length + 1; // skip val_len
+                    byte[] mod = data.clone();
+                    for (int b = 0; b < nv.length; b++)
+                        mod[vp + b] = (byte)(nv[b] ^ k);
+                    Log.i("WSS", name + " injected");
+                    return mod;
+                }
+            }
+        }
+        return data;
     }
 }

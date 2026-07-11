@@ -3,12 +3,10 @@ import 'package:proxypin/network/channel/channel_context.dart';
 
 class RelayHandler extends ChannelHandler<Object> {
   final Channel remoteChannel;
-
   RelayHandler(this.remoteChannel);
 
   @override
   Future<void> channelRead(ChannelContext channelContext, Channel channel, Object msg) async {
-    //发送给客户端
     remoteChannel.write(channelContext, msg);
   }
 

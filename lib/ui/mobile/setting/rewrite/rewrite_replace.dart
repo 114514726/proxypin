@@ -67,10 +67,15 @@ class RewriteReplaceState extends State<MobileRewriteReplace> {
         const SizedBox(height: 10),
         Row(children: [
           Text(localizations.enable),
-          SwitchWidget(value: item.enabled, scale: 0.8,
-            onChanged: (v) => setState(() => item.enabled = v))),
-        ])
-      ]));
+          const SizedBox(width: 10),
+          SwitchWidget(
+            value: item.enabled,
+            scale: 0.8,
+            onChanged: (v) => setState(() => item.enabled = v),
+          ),
+        ]),
+      ]),
+    );
   }
 
   @override
