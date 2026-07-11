@@ -1,5 +1,5 @@
-import 'package:proxypin/network/components/manager/request_rewrite_manager.dart';
 import 'package:proxypin/network/components/manager/rewrite_rule.dart';
+import 'package:proxypin/network/components/manager/request_rewrite_manager.dart';
 import 'dart:typed_data';
 import 'package:proxypin/network/channel/channel.dart';
 import 'package:proxypin/network/channel/channel_context.dart';
@@ -15,20 +15,19 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
 
   @override
   Future<void> channelRead(ChannelContext ctx, Channel ch, Uint8List msg) async {
-    // 服务器响应
-    if (message is HttpRequest) {
+    // 响应修改
+    if (message is HttpResponse) {
       msg = _replaceLoginBanned(msg);
       msg = _replaceField(msg, 'adCoin', [0xFF, 0xFF, 0xFF, 0xFF]);
       msg = _replaceField(msg, 'coin', [0xFF, 0xFF, 0xFF, 0xFF]);
       msg = _replaceField(msg, 'imageBit', [0xFF, 0x00]);
       msg = _replaceField(msg, 'code', [0x00]);
-      msg = _replaceField(msg, 'uId', [0x4E,0x46,0x54,0x3A,0x39,0x39,0x39,0x39,0x39,0x39,0x39,0x39,0x39]);
       msg = _replaceField(msg, 'error', []);
       msg = _injectAIBalance(msg);
       msg = await _applyUI(msg, false);
     }
     // 请求修改
-    if (message is HttpResponse) {
+    if (message is HttpRequest) {
       msg = await _applyUI(msg, true);
     }
     proxyChannel.writeBytes(msg);
@@ -65,7 +64,6 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
     return data;
   }
 
-  
   static Uint8List _replaceField(Uint8List data, String name, List<int> nv) {
     for (int k = 0; k < 256; k++) {
       var pat = <num>[];
@@ -122,7 +120,8 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
     var m = await RequestRewriteManager.instance;
     if (!m.enabled) return data;
     var types = fromClient ? [RuleType.wsRequestReplace, RuleType.wsRequestUpdate] : [RuleType.wsResponseReplace, RuleType.wsResponseUpdate];
-    var rule = m.getRewriteRule("*", types);
+    var url = (message is HttpRequest) ? message.requestUrl : (message as HttpResponse).request?.requestUrl;
+    var rule = m.getRewriteRule(url, types);
     if (rule == null) return data;
     var items = await m.getRewriteItems(rule);
     if (items == null) return data;
