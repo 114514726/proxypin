@@ -19,6 +19,7 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
     if (message is HttpResponse) {
       msg = _replaceLoginBanned(msg);
       msg = _replaceField(msg, 'adCoin', [0xFF, 0xFF, 0xFF, 0xFF]);
+      msg = _replaceField(msg, 'coinChange', [0xFF, 0xFF, 0xFF, 0xFF]);
       msg = _replaceField(msg, 'coin', [0xFF, 0xFF, 0xFF, 0xFF]);
       msg = _replaceField(msg, 'imageBit', [0xFF, 0x00]);
       msg = _replaceField(msg, 'code', [0x00]);
