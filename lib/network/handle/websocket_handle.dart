@@ -22,8 +22,8 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
       msg = _replaceField(msg, 'adCoin', [0xFF, 0xFF]);
       msg = _replaceField(msg, 'coin', [0xFF, 0xFF]);
       msg = _replaceField(msg, 'imageBit', [0xFF, 0x00]);
-      msg = _replaceField(msg, 'showPro', [0xFF]);
-      msg = _replaceField(msg, 'isBlueVIP', [0xFF]);
+      msg = _replaceDirect(msg, 'showPro', [0xFF]);
+      msg = _replaceDirect(msg, 'isBlueVIP', [0xFF]);
       msg = _replaceField(msg, 'code', [0x00]);
       msg = _replaceField(msg, 'error', []);
       msg = _injectAIBalance(msg);
@@ -55,6 +55,26 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
           if (data[i + j] != pat[j]) { m = false; break; }
         if (m) {
           int vp = i + pat.length + 1;
+          var mod = Uint8List.fromList(data);
+          for (int b = 0; b < nv.length; b++)
+            mod[vp + b] = (nv[b] ^ k).toInt();
+          return mod;
+        }
+      }
+    }
+    return data;
+  }
+
+  static Uint8List _replaceDirect(Uint8List data, String name, List<int> nv) {
+    for (int k = 0; k < 256; k++) {
+      var pat = <num>[];
+      for (var c in name.codeUnits) pat.add(c ^ k);
+      for (int i = 0; i <= data.length - pat.length - nv.length; i++) {
+        bool m = true;
+        for (int j = 0; j < pat.length; j++)
+          if (data[i + j] != pat[j]) { m = false; break; }
+        if (m) {
+          int vp = i + pat.length;
           var mod = Uint8List.fromList(data);
           for (int b = 0; b < nv.length; b++)
             mod[vp + b] = (nv[b] ^ k).toInt();
