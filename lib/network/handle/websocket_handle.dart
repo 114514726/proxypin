@@ -19,8 +19,8 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
     var gzipped = msg.length > 500;
     if (gzipped) try { msg = Uint8List.fromList(gzip.decode(msg)); } catch (_) { gzipped = false; }
     if (message is HttpResponse) {
-      msg = _replaceField(msg, 'adCoin', [0xFF, 0xFF]);
-      msg = _replaceField(msg, 'coin', [0xFF, 0xFF]);
+      msg = _replaceField(msg, 'followState', [0x03]);
+      msg = _replaceField(msg, 'coin', [0xFF, 0xFF, 0xFF]);
       msg = _replaceField(msg, 'imageBit', [0xFF, 0x00]);
       msg = _replaceDirect(msg, 'showPro', [0xFF]);
       msg = _replaceDirect(msg, 'isBlueVIP', [0xFF]);
