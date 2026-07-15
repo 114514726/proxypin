@@ -21,10 +21,10 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
     if (message is HttpResponse) {
       msg = _replaceField(msg, 'followState', [0x03]);
       msg = _replaceField(msg, 'coin', [0xFF, 0xFF, 0xFF]);
-      msg = _replaceField(msg, 'imageBit', [0xFF, 0x00]);
+      msg = _replaceField(msg, 'state', [0x03]);
       msg = _replaceDirect(msg, 'showPro', [0xFF]);
       msg = _replaceDirect(msg, 'isBlueVIP', [0xFF]);
-      msg = _replaceField(msg, 'state', [0x03]);
+      msg = _replaceField(msg, 'imageBit', [0xFF, 0x00]);
       msg = _replaceField(msg, 'error', []);
       msg = _injectAIBalance(msg);
       msg = await _applyUI(msg, false);
