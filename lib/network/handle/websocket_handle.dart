@@ -16,32 +16,144 @@ class WebSocketChannelHandler extends ChannelHandler<Uint8List> {
 
   @override
   Future<void> channelRead(ChannelContext ctx, Channel ch, Uint8List msg) async {
-    var gzipped = msg.length > 500;
-    if (gzipped) try { msg = Uint8List.fromList(gzip.decode(msg)); } catch (_) { gzipped = false; }
-    if (message is HttpResponse) {
+    // 挂在服务器通道上时 message 就是握手响应(HttpResponse)
+    // => message is HttpResponse = 服务器->客户端（响应），否则是客户端->服务器（请求）
+    final bool fromServer = message is HttpResponse;
+
+    if (fromServer) {
+      final int rawLen = msg.length;
+
+      // 1) 带 error 字段的帧整帧丢弃，不写回客户端 => 屏蔽该响应
+      msg = _dropErrorFrames(msg);
+      if (msg.isEmpty) {
+        logger.d('[WSS] blocked error response, $rawLen bytes');
+        return;
+      }
+
+      var gzipped = _isGzip(msg);
+      if (gzipped) {
+        try {
+          msg = Uint8List.fromList(gzip.decode(msg));
+        } catch (_) {
+          gzipped = false;
+        }
+      }
+
       msg = _replaceField(msg, 'followState', [0x03]);
       msg = _replaceField(msg, 'coin', [0xFF, 0xFF, 0xFF]);
       msg = _replaceField(msg, 'state', [0x03]);
       msg = _replaceDirect(msg, 'showPro', [0xFF]);
       msg = _replaceDirect(msg, 'isBlueVIP', [0xFF]);
       msg = _replaceField(msg, 'imageBit', [0xFF, 0x00]);
-      msg = _replaceField(msg, 'error', []);
       msg = _injectAIBalance(msg);
       msg = await _applyUI(msg, false);
-    }
-    if (message is HttpRequest) {
+
+      if (gzipped) {
+        try {
+          msg = Uint8List.fromList(gzip.encode(msg));
+        } catch (_) {}
+      }
+    } else {
       msg = await _applyUI(msg, true);
     }
-    if (gzipped) try { msg = Uint8List.fromList(gzip.encode(msg)); } catch (_) {}
+
     proxyChannel.writeBytes(msg);
     try {
       var f = decoder.decode(msg);
       if (f != null) {
-        f.isFromClient = message is HttpRequest;
+        f.isFromClient = !fromServer;
         message.messages.add(f);
         ctx.listener?.onMessage(ch, message, f);
       }
     } catch (_) {}
+  }
+
+  /// 按 WebSocket 帧切分，payload 里带 error 字段的数据帧整帧丢掉。
+  /// 返回空数组 = 整块不转发（客户端收不到这个响应）
+  static Uint8List _dropErrorFrames(Uint8List data) {
+    if (data.length < 6) return data;
+    final out = BytesBuilder(copy: false);
+    int i = 0;
+    bool dropped = false;
+
+    while (i + 2 <= data.length) {
+      final int b1 = data[i + 1];
+      final int opcode = data[i] & 0x0F;
+      final bool masked = (b1 & 0x80) != 0;
+      int len = b1 & 0x7F;
+      int hdr = 2;
+      if (len == 126) {
+        if (i + 4 > data.length) break;
+        len = (data[i + 2] << 8) | data[i + 3];
+        hdr = 4;
+      } else if (len == 127) {
+        if (i + 10 > data.length) break;
+        len = 0;
+        for (int j = 0; j < 8; j++) {
+          len = (len << 8) | data[i + 2 + j];
+        }
+        hdr = 10;
+      }
+      if (masked) hdr += 4;
+      final int total = hdr + len;
+      if (len < 0 || total <= hdr || i + total > data.length) break;
+
+      // 服务器下发的帧不加掩码；带掩码的是客户端方向，不处理
+      if (!masked && (opcode == 0x01 || opcode == 0x02)) {
+        final payload = Uint8List.sublistView(data, i + hdr, i + total);
+        if (_hasError(payload)) {
+          dropped = true;
+          i += total;
+          continue;
+        }
+      }
+      out.add(Uint8List.sublistView(data, i, i + total));
+      i += total;
+    }
+
+    if (i == 0) {
+      // 不是标准 WS 帧（或只有 payload），退化成整包判断
+      return _hasError(data) ? Uint8List(0) : data;
+    }
+    if (!dropped) return data;
+    if (i < data.length) out.add(Uint8List.sublistView(data, i));
+    return out.toBytes();
+  }
+
+  static bool _isGzip(Uint8List d) => d.length > 2 && d[0] == 0x1F && d[1] == 0x8B;
+
+  /// 找 error 字段：TLV 里是 [type=0x05][nameLen=0x05]["error"]
+  static bool _hasError(Uint8List data) {
+    final k = _xorKey(data);
+    if (k != null) return _matchError(data, k);
+    for (int kk = 0; kk < 256; kk++) {
+      if (_matchError(data, kk)) return true;
+    }
+    return false;
+  }
+
+  /// 明文: "px" [2B] [0x08 map] [字段数] [0x05 ...]，除 "px" 外整段单字节 XOR
+  static int? _xorKey(Uint8List d) {
+    if (d.length < 8 || d[0] != 0x70 || d[1] != 0x78) return null;
+    final k = d[4] ^ 0x08;
+    final cnt = d[5] ^ k;
+    if (cnt < 1 || cnt > 64) return null;
+    if ((d[6] ^ k) != 0x05) return null;
+    return k;
+  }
+
+  static bool _matchError(Uint8List d, int k) {
+    final b0 = 0x05 ^ k;
+    final be = 0x65 ^ k;
+    final br = 0x72 ^ k;
+    final bo = 0x6F ^ k;
+    for (int i = 0; i <= d.length - 6; i++) {
+      if (d[i] != b0) continue;
+      if (d[i + 1] == be && d[i + 2] == br && d[i + 3] == br && d[i + 4] == bo && d[i + 5] == br) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static Uint8List _replaceField(Uint8List data, String name, List<int> nv) {
